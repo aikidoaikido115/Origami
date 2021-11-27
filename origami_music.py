@@ -35,7 +35,7 @@ YDL_OPTIONS = {
 
 FFMPEG_OPTIONS = {
     'options': '-vn',
-    "before_options": "-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5"} ## song will end if no this line
+    "before_options": "-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5"}
 
 
 def GET_BTC_PRICE():
@@ -87,11 +87,10 @@ class YTDLSource(discord.PCMVolumeTransformer):
         data = await loop.run_in_executor(None, to_run)
 
         if 'entries' in data:
-            # take first item from a playlist
+
             data = data['entries'][0]
 
-        await ctx.send(f'```ini\n[Added {data["title"]} to the Queue.]\n```') #delete after can be added
-
+        await ctx.send(f'```ini\n[Added {data["title"]} to the Queue.]\n```')
         if download:
             source = ytdl.prepare_filename(data)
         else:
@@ -101,8 +100,6 @@ class YTDLSource(discord.PCMVolumeTransformer):
 
     @classmethod
     async def regather_stream(cls, data, *, loop):
-        """Used for preparing a stream, instead of downloading.
-        Since Youtube Streaming links expire."""
         loop = loop or asyncio.get_event_loop()
         requester = data['requester']
 
@@ -112,11 +109,6 @@ class YTDLSource(discord.PCMVolumeTransformer):
         return cls(discord.FFmpegPCMAudio(data['url'], **FFMPEG_OPTIONS), data=data, requester=requester)
 
 class MusicPlayer:
-    """A class which is assigned to each guild using the bot for Music.
-    This class implements a queue and loop, which allows for different guilds to listen to different playlists
-    simultaneously.
-    When the bot disconnects from the Voice it's instance will be destroyed.
-    """
 
     __slots__ = ('bot', '_guild', '_channel', '_cog', 'queue', 'next', 'current', 'np', 'volume')
 
@@ -129,21 +121,20 @@ class MusicPlayer:
         self.queue = asyncio.Queue()
         self.next = asyncio.Event()
 
-        self.np = None  # Now playing message
+        self.np = None
         self.volume = .5
         self.current = None
 
         ctx.bot.loop.create_task(self.player_loop())
 
     async def player_loop(self):
-        """Our main player loop."""
         await self.bot.wait_until_ready()
 
         while not self.bot.is_closed():
             self.next.clear()
 
             try:
-                # Wait for the next song. If we timeout cancel the player and disconnect...
+
                 async with timeout(3600): # 1 hr
                     source = await self.queue.get()
             except asyncio.TimeoutError:
@@ -151,8 +142,7 @@ class MusicPlayer:
                 return await self.destroy(self._guild)
 
             if not isinstance(source, YTDLSource):
-                # Source was probably a stream (not downloaded)
-                # So we should regather to prevent stream expiration
+
                 try:
                     source = await YTDLSource.regather_stream(source, loop=self.bot.loop)
                 except Exception as e:
@@ -168,18 +158,18 @@ class MusicPlayer:
                                                f'`{source.requester}`')
             await self.next.wait()
 
-            # Make sure the FFmpeg process is cleaned up.
+
             source.cleanup()
             self.current = None
 
             try:
-                # We are no longer playing this song...
+
                 await self.np.delete()
             except discord.HTTPException:
                 pass
 
     async def destroy(self, guild):
-        """Disconnect and cleanup the player."""
+
         # del players[self._guild]
         await self._guild.voice_client.disconnect()
         return self.bot.loop.create_task(self._cog.cleanup(guild))
